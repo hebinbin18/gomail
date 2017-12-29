@@ -16,7 +16,7 @@ func Example() {
 
 	m.SetHtmlMail()
 	m.SetMailContent("this is mail content !")
-	m.AddAttachment("C:/Users/hebin/Desktop/123.jpg", "123.jpg")
+	m.AddAttachment("/test.jpg", "test.jpg")
 
 	m.Send()
 }
