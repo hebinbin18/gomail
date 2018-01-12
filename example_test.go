@@ -3,7 +3,7 @@ package gomail_test
 import "github.com/hebinbin18/gomail"
 
 func Example() {
-	m := gomail.NewMail()
+	m := gomail.NewClient()
 	m.SetHost("smtp.exmail.qq.com", 25)
 	m.SetAuth("", "")
 
@@ -18,5 +18,5 @@ func Example() {
 	m.SetMailContent("this is mail content !")
 	m.AddAttachment("/test.jpg", "test.jpg")
 
-	m.Send()
+	m.SendMail()
 }
