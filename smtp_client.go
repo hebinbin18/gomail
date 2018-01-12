@@ -60,7 +60,7 @@ func (ms *client) getContent() string {
 }
 
 func (ms *client) getServerHostName() string {
-	return "localhost.localdomain"
+	return "hebin-Pro"
 }
 
 // 外部方法
