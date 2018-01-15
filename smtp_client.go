@@ -55,8 +55,8 @@ func (ms *client) getSendTo() []string {
 	return ms.address
 }
 
-func (ms *client) getContent() string {
-	return ms.content
+func (ms *client) getContent() []byte {
+	return []byte(ms.content)
 }
 
 func (ms *client) getServerHostName() string {

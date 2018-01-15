@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"io/ioutil"
 	"mime"
+	"bytes"
 )
 
 const (
@@ -37,13 +38,7 @@ func (c *goSMTPConn) bEncode(src string) string {
 	return dst
 }
 
-func (c *goSMTPConn) base64Encode(src string) string {
-	dst := base64.StdEncoding.EncodeToString([]byte(src))
-
-	return dst
-}
-
-func (c *goSMTPConn) base64Encode2(src []byte) string {
+func (c *goSMTPConn) base64Encode(src []byte) string {
 	dst := base64.StdEncoding.EncodeToString(src)
 
 	return dst
@@ -53,6 +48,15 @@ func (c *goSMTPConn) md5Encode(src string) string {
 	h := md5.New()
 	h.Write([]byte(src))
 	dst := hex.EncodeToString(h.Sum(nil))
+
+	return dst
+}
+
+func (c *goSMTPConn) addrEncode(name, addr string) string {
+	if "" == name {
+		name = strings.Split(addr, "@")[0]
+	}
+	dst := fmt.Sprintf(`"=?utf-8?b?%s?="<%s>`, c.base64Encode([]byte(name)), addr)
 
 	return dst
 }
@@ -98,89 +102,69 @@ func (c *goSMTPConn) echoCMD(cmd string) (string, error) {
 // http://tools.ietf.org/html/rfc4021
 func (c *goSMTPConn) createHeader() string {
 	c.uniqueId = c.md5Encode(time.Now().String())
-	c.boundary1 = "----=b1_" + c.uniqueId
-	c.boundary2 = "----=b2_" + c.uniqueId
-
-	// 收件人信息
-	fromName := c.mClient.fromAddr
-	//replyName := c.mClient.fromAddr
-	replyAddr := c.mClient.fromAddr
-	if "" != c.mClient.fromName {
-		fromName = c.mClient.fromName
-	}
-	if "" != c.mClient.replyName {
-		//replyName = c.mClient.replyName
-	}
-	if "" != c.mClient.replyAddr {
-		replyAddr = c.mClient.replyAddr
-	}
+	c.boundary1 = "----=BOUNDARY_1_" + c.uniqueId
+	c.boundary2 = "----=BOUNDARY_2_" + c.uniqueId
 
 	// 邮件头
-	header := "Date: " + time.Now().Format(time.RFC1123Z) + LF
-	header += "Return-Path: " + c.bEncode(fromName) + LF
-	//send := "To: " + strings.Join(c.mClient.addressSend, ";") + LF
-	send := fmt.Sprintf(`To: "%s"<%s>`, c.bEncode(c.mClient.addressSend[0]), c.mClient.addressSend[0]) + LF
-	cc, bcc := "", ""
-	if len(c.mClient.addressCC) > 0 {
-		cc = "Cc: " + strings.Join(c.mClient.addressCC, ";") + LF
+	buf := new(bytes.Buffer)
+	buf.WriteString("Date: " + time.Now().Format(time.RFC1123Z) + LF)
+	//buf.WriteString("Return-Path: " + c.bEncode(c.mClient.fromName) + LF)
+	addrList1 := make([]string, len(c.mClient.addressSend))
+	addrList2 := make([]string, len(c.mClient.addressCC))
+	addrList3 := make([]string, len(c.mClient.addressBCC))
+	for i, addr := range c.mClient.addressSend {
+		addrList1[i] = c.addrEncode("", addr)
 	}
-	if len(c.mClient.addressBCC) > 0 {
-		bcc = "Bcc: " + strings.Join(c.mClient.addressBCC, ";") + LF
+	for i, addr := range c.mClient.addressCC {
+		addrList2[i] = c.addrEncode("", addr)
+	}
+	for i, addr := range c.mClient.addressBCC {
+		addrList3[i] = c.addrEncode("", addr)
+	}
+	buf.WriteString("To: " + strings.Join(addrList1, ";") + LF)
+	if len(addrList2) > 0 {
+		buf.WriteString("Cc: " + strings.Join(addrList2, ";") + LF)
+	}
+	if len(addrList3) > 0 {
+		buf.WriteString("Bcc: " + strings.Join(addrList3, ";") + LF)
+	}
+	buf.WriteString("From: " + c.addrEncode(c.mClient.fromName, c.mClient.fromAddr) + LF)
+	if "" != c.mClient.replyAddr {
+		buf.WriteString("Reply-to: " + c.addrEncode(c.mClient.replyName, c.mClient.replyAddr) + LF)
 	}
 
-	from := fmt.Sprintf(`From: "%s"<%s>`, c.bEncode(fromName), c.mClient.fromAddr) + LF
-	reply := fmt.Sprintf(`Reply-to: "%s"<%s>`, c.bEncode(c.mClient.replyName), replyAddr) + LF
 	// 主题信息
-	subject := fmt.Sprintf("Subject: %s%s", c.bEncode(c.mClient.subject), LF)
-	subject += fmt.Sprintf("Message-ID: <54c3aee5da3b50b47a9ee09defb8c00e@%s>%s", c.mClient.getServerHostName(), LF)
-	subject += "X-Priority: " + c.mClient.priority + LF
-	subject += "Foxmail_for_Mac 1.0.0" + LF
-	//	subject += fmt.Sprintf("Disposition-Notification-To: <%s>%s", c.mClient.from.mailAddr, LF)
-	subject += "Mime-Version: 1.0" + LF
-	header += send + cc + bcc + from + reply + subject
+	buf.WriteString("Subject: " + c.bEncode(c.mClient.subject) + LF)
+	buf.WriteString(fmt.Sprintf("Message-ID: <54c3aee5da3b50b47a9ee09defb8c00e@%s>", c.mClient.getServerHostName()) + LF)
+	buf.WriteString("X-Priority: " + c.mClient.priority + LF)
+	buf.WriteString("GoMail 1.0.0" + LF)
+	//buf.WriteString(fmt.Sprintf("Disposition-Notification-To: <%s>", c.mClient.fromAddr) +  LF)
+	buf.WriteString("Mime-Version: 1.0" + LF)
 
-	//return header
-	// mime type + content
-	content := ""
-	if len(c.mClient.attachments) > 0 {
-		content += "Content-Type: multipart/alternative;" + LF
-		content += fmt.Sprintf(`%sboundary="%s"%s%s%s`, TAB, c.boundary1, LF, LF, LF)
-		content += fmt.Sprintf(`%s%s`, c.boundary1, LF)
-		content += fmt.Sprintf(`Content-Type: multipart/mixed;%s%sboundary="%s"%s%s`, LF, TAB, c.boundary2, LF, LF)
-
-		content += c.boundary2 + LF
-		content += `Content-Type: text/plain; charset = "utf-8"` + LF
-		content += "Content-Transfer-Encoding: base64" + LF
-		content += LF + LF
-		content += c.base64Encode("text/html") + LF
-		content += LF + LF
-		content += c.boundary2 + LF
-		content += `Content-Type: text/html; charset = "utf-8"` + LF
-		content += "Content-Transfer-Encoding: base64" + LF
-		content += LF + LF
-		content += c.base64Encode(c.mClient.getContent()) + LF
-		content += LF + LF
-		content += c.boundary2 + "--" + LF
+	// 正文
+	buf.WriteString("Content-Type: multipart/alternative;" + LF)
+	buf.WriteString(TAB + `boundary="` + c.boundary1 + `"` + LF)
+	buf.WriteString(LF)
+	if "html" == c.mClient.mailType {
+		buf.WriteString("--" + c.boundary1 + LF)
+		buf.WriteString("Content-Type: text/html;" + LF)
+		buf.WriteString(TAB + `charset="utf-8"` + LF)
+		buf.WriteString("Content-Transfer-Encoding: base64" + LF)
+		buf.WriteString(LF)
+		buf.WriteString(c.base64Encode(c.mClient.getContent()) + LF)
+		buf.WriteString(LF)
 	} else {
-		content += fmt.Sprintf(`Content-Type: multipart/alternative;%s%sboundary="%s"%s%s`, LF, TAB, c.boundary1, LF, LF)
-
-		content += "--" + c.boundary1 + LF
-		content += `Content-Type: text/plain;` + LF + TAB + `charset="utf-8"` + LF
-		content += "Content-Transfer-Encoding: base64" + LF
-		content += LF
-		content += c.base64Encode("text/html") + LF
-		content += LF
-		content += "--" + c.boundary1 + LF
-		content += `Content-Type: text/html;` + LF + TAB + `charset="utf-8"` + LF
-		content += "Content-Transfer-Encoding: base64" + LF
-		content += LF
-		content += c.base64Encode(c.mClient.getContent()) + LF
-		content += LF
-		content += "--" + c.boundary1 + "--" + LF
+		buf.WriteString("--" + c.boundary1 + LF)
+		buf.WriteString("Content-Type: text/plain;" + LF)
+		buf.WriteString(TAB + `charset="utf-8"` + LF)
+		buf.WriteString("Content-Transfer-Encoding: base64" + LF)
+		buf.WriteString(LF)
+		buf.WriteString(c.base64Encode(c.mClient.getContent()) + LF)
+		buf.WriteString(LF)
 	}
-	header += content
+	buf.WriteString("--" + c.boundary1 + "--" + LF)
 
-	return header
+	return buf.String()
 }
 
 func (c *goSMTPConn) getAttachments() string {
@@ -209,14 +193,14 @@ func (c *goSMTPConn) getAttachments() string {
 			if err != nil {
 				panic("fetch attachments " + path + " error2")
 			}
-			fBufferB64 = c.base64Encode2(fBuffer)
+			fBufferB64 = c.base64Encode(fBuffer)
 		} else {
 			fi, err := os.Open(path)
 			if err != nil {
 				panic(err)
 			}
 			fBuffer, err := ioutil.ReadAll(fi)
-			fBufferB64 = c.base64Encode2(fBuffer)
+			fBufferB64 = c.base64Encode(fBuffer)
 			fi.Close()
 		}
 
@@ -254,7 +238,7 @@ func (c *goSMTPConn) authenticate() error {
 		}
 	}
 	// Step 2
-	name := c.base64Encode(c.mClient.getUserName())
+	name := c.base64Encode([]byte(c.mClient.getUserName()))
 	code, err = c.echoCMD(name)
 	if err != nil {
 		return err
@@ -264,7 +248,7 @@ func (c *goSMTPConn) authenticate() error {
 	}
 
 	// Step 3
-	password := c.base64Encode(c.mClient.getPassword())
+	password := c.base64Encode([]byte(c.mClient.getPassword()))
 	code, err = c.echoCMD(password)
 	if err != nil {
 		return err
