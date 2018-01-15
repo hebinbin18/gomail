@@ -10,24 +10,25 @@ type auth struct {
 }
 
 type client struct {
-	auth        auth
-	SSL         bool
-	hostPort    string
-	fromAddr    string
-	fromName    string
-	replyAddr   string
-	replyName   string
-	priority    string //(1 = High, 3 = Normal, 5 = low).
-	subject     string
-	address     []string
-	addressSend []string
-	addressCC   []string
-	addressBCC  []string
-	attachments []map[string]string
-	content     string
-	mailType    string
-	tryTime     int
-	debug       bool
+	auth         auth
+	SSL          bool
+	hostPort     string
+	fromAddr     string
+	fromName     string
+	replyAddr    string
+	replyName    string
+	priority     string //(1 = High, 3 = Normal, 5 = low).
+	notification bool   // 已读回执
+	subject      string
+	address      []string // 收件人 + 抄送 + 密送
+	addressSend  []string // 收件人
+	addressCC    []string // 抄送
+	addressBCC   []string // 密送
+	attachments  []map[string]string
+	content      string
+	mailType     string
+	tryTime      int
+	debug        bool
 }
 
 func NewClient() *client {
@@ -102,6 +103,14 @@ func (ms *client) SetHostStr(hpStr string) {
 
 func (ms *client) SetSubject(subject string) {
 	ms.subject = subject
+}
+
+func (ms *client) ShowNotification() {
+	ms.notification = true
+}
+
+func (ms *client) CloseNotification() {
+	ms.notification = false
 }
 
 func (ms *client) AddAddress(address string) {
