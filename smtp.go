@@ -13,6 +13,7 @@ import (
 	"os"
 	"net/http"
 	"io/ioutil"
+	"mime"
 )
 
 const (
@@ -28,6 +29,12 @@ type goSMTPConn struct {
 	boundary2 string
 	conn      net.Conn
 	mClient   *client
+}
+
+func (c *goSMTPConn) bEncode(src string) string {
+	dst := mime.WordEncoder.Encode(mime.BEncoding, "utf-8", src)
+
+	return dst
 }
 
 func (c *goSMTPConn) base64Encode(src string) string {
@@ -50,19 +57,23 @@ func (c *goSMTPConn) md5Encode(src string) string {
 	return dst
 }
 
-func (c *goSMTPConn) echoCMD(cmd string) (string, error) {
-	cmd += CRLF
-	cnt, err := c.conn.Write([]byte(cmd))
+func (c *goSMTPConn) sendData(dat string) error {
+	dat += CRLF
+	cnt, err := c.conn.Write([]byte(dat))
 	if c.debug && cnt < 1000 {
-		fmt.Println("==> GoMail Send Data Content:", cmd)
+		fmt.Println("==> GoMail Send Data Content:", dat)
 	}
 	if err != nil {
 		fmt.Println("==> GoMail Send Error:", err.Error())
-		return "", err
+		return err
 	}
 
-	buf := make([]byte, 728) // 515
-	cnt, err = c.conn.Read(buf)
+	return nil
+}
+
+func (c *goSMTPConn) recvData() (string, error) {
+	buf := make([]byte, 1024) // 515
+	_, err := c.conn.Read(buf)
 	data := string(buf)
 	if c.debug {
 		fmt.Println("<== GoMail Recv Data Content:", data)
@@ -75,31 +86,40 @@ func (c *goSMTPConn) echoCMD(cmd string) (string, error) {
 	return data[0:3], nil
 }
 
+func (c *goSMTPConn) echoCMD(cmd string) (string, error) {
+	err := c.sendData(cmd)
+	if nil != err {
+		return "", err
+	}
+
+	return c.recvData()
+}
+
 // http://tools.ietf.org/html/rfc4021
 func (c *goSMTPConn) createHeader() string {
 	c.uniqueId = c.md5Encode(time.Now().String())
-	c.boundary1 = "----b1_" + c.uniqueId
-	c.boundary2 = "----b2_" + c.uniqueId
-
-	// 邮件头
-	header := "Date: " + time.Now().Format(time.RFC1123Z) + LF
+	c.boundary1 = "----=b1_" + c.uniqueId
+	c.boundary2 = "----=b2_" + c.uniqueId
 
 	// 收件人信息
 	fromName := c.mClient.fromAddr
-	replyName := c.mClient.fromAddr
+	//replyName := c.mClient.fromAddr
 	replyAddr := c.mClient.fromAddr
 	if "" != c.mClient.fromName {
 		fromName = c.mClient.fromName
 	}
 	if "" != c.mClient.replyName {
-		replyName = c.mClient.replyName
+		//replyName = c.mClient.replyName
 	}
 	if "" != c.mClient.replyAddr {
 		replyAddr = c.mClient.replyAddr
 	}
 
-	header += "Return-Path: " + fromName + LF
-	send := "To: " + strings.Join(c.mClient.addressSend, ";") + LF
+	// 邮件头
+	header := "Date: " + time.Now().Format(time.RFC1123Z) + LF
+	header += "Return-Path: " + c.bEncode(fromName) + LF
+	//send := "To: " + strings.Join(c.mClient.addressSend, ";") + LF
+	send := fmt.Sprintf(`To: "%s"<%s>`, c.bEncode(c.mClient.addressSend[0]), c.mClient.addressSend[0]) + LF
 	cc, bcc := "", ""
 	if len(c.mClient.addressCC) > 0 {
 		cc = "Cc: " + strings.Join(c.mClient.addressCC, ";") + LF
@@ -107,60 +127,58 @@ func (c *goSMTPConn) createHeader() string {
 	if len(c.mClient.addressBCC) > 0 {
 		bcc = "Bcc: " + strings.Join(c.mClient.addressBCC, ";") + LF
 	}
-	if "" == c.mClient.fromName {
-		c.mClient.fromName = c.mClient.fromAddr
-	}
 
-	from := fmt.Sprintf(`From: "=?utf-8?B?%s?="<%s>`, c.base64Encode(fromName), c.mClient.fromAddr) + LF
-	reply := fmt.Sprintf(`Reply-to: "=?utf-8?B?%s?="<%s>`, c.base64Encode(replyName), replyAddr) + LF
+	from := fmt.Sprintf(`From: "%s"<%s>`, c.bEncode(fromName), c.mClient.fromAddr) + LF
+	reply := fmt.Sprintf(`Reply-to: "%s"<%s>`, c.bEncode(c.mClient.replyName), replyAddr) + LF
 	// 主题信息
-	subject := fmt.Sprintf("Subject: =?utf-8?B?%s?=%s", c.base64Encode(c.mClient.subject), LF)
+	subject := fmt.Sprintf("Subject: %s%s", c.bEncode(c.mClient.subject), LF)
 	subject += fmt.Sprintf("Message-ID: <54c3aee5da3b50b47a9ee09defb8c00e@%s>%s", c.mClient.getServerHostName(), LF)
 	subject += "X-Priority: " + c.mClient.priority + LF
-	subject += "X-Mailer: GoLang (phpmailer.sourceforge.net)" + LF
+	subject += "Foxmail_for_Mac 1.0.0" + LF
 	//	subject += fmt.Sprintf("Disposition-Notification-To: <%s>%s", c.mClient.from.mailAddr, LF)
-	subject += "MIME-Version: 1.0" + LF
+	subject += "Mime-Version: 1.0" + LF
 	header += send + cc + bcc + from + reply + subject
 
+	//return header
 	// mime type + content
-	mime := ""
+	content := ""
 	if len(c.mClient.attachments) > 0 {
-		mime += "Content-Type: multipart/mixed;" + LF
-		mime += fmt.Sprintf(`%sboundary="%s"%s%s%s`, TAB, c.boundary1, LF, LF, LF)
-		mime += fmt.Sprintf(`%s%s`, c.boundary1, LF)
-		mime += fmt.Sprintf(`Content-Type: multipart/mixed;%s%sboundary="%s"%s%s`, LF, TAB, c.boundary2, LF, LF)
+		content += "Content-Type: multipart/alternative;" + LF
+		content += fmt.Sprintf(`%sboundary="%s"%s%s%s`, TAB, c.boundary1, LF, LF, LF)
+		content += fmt.Sprintf(`%s%s`, c.boundary1, LF)
+		content += fmt.Sprintf(`Content-Type: multipart/mixed;%s%sboundary="%s"%s%s`, LF, TAB, c.boundary2, LF, LF)
 
-		mime += c.boundary2 + LF
-		mime += `Content-Type: text/plain; charset = "utf-8"` + LF
-		mime += "Content-Transfer-Encoding: base64" + LF
-		mime += LF + LF
-		mime += c.base64Encode("text/html") + LF
-		mime += LF + LF
-		mime += c.boundary2 + LF
-		mime += `Content-Type: text/html; charset = "utf-8"` + LF
-		mime += "Content-Transfer-Encoding: base64" + LF
-		mime += LF + LF
-		mime += c.base64Encode(c.mClient.getContent()) + LF
-		mime += LF + LF
-		mime += c.boundary2 + "--" + LF
+		content += c.boundary2 + LF
+		content += `Content-Type: text/plain; charset = "utf-8"` + LF
+		content += "Content-Transfer-Encoding: base64" + LF
+		content += LF + LF
+		content += c.base64Encode("text/html") + LF
+		content += LF + LF
+		content += c.boundary2 + LF
+		content += `Content-Type: text/html; charset = "utf-8"` + LF
+		content += "Content-Transfer-Encoding: base64" + LF
+		content += LF + LF
+		content += c.base64Encode(c.mClient.getContent()) + LF
+		content += LF + LF
+		content += c.boundary2 + "--" + LF
 	} else {
-		mime += fmt.Sprintf(`Content-Type: multipart/mixed;%s%sboundary="%s"%s%s`, LF, TAB, c.boundary1, LF, LF)
+		content += fmt.Sprintf(`Content-Type: multipart/alternative;%s%sboundary="%s"%s%s`, LF, TAB, c.boundary1, LF, LF)
 
-		mime += c.boundary1 + LF
-		mime += `Content-Type: text/plain; charset = "utf-8"` + LF
-		mime += "Content-Transfer-Encoding: base64" + LF
-		mime += LF + LF
-		mime += c.base64Encode("text/html") + LF
-		mime += LF + LF
-		mime += c.boundary1 + LF
-		mime += `Content-Type: text/html; charset = "utf-8"` + LF
-		mime += "Content-Transfer-Encoding: base64" + LF
-		mime += LF + LF
-		mime += c.base64Encode(c.mClient.getContent()) + LF
-		mime += LF + LF
-		mime += c.boundary1 + "--" + LF
+		content += "--" + c.boundary1 + LF
+		content += `Content-Type: text/plain;` + LF + TAB + `charset="utf-8"` + LF
+		content += "Content-Transfer-Encoding: base64" + LF
+		content += LF
+		content += c.base64Encode("text/html") + LF
+		content += LF
+		content += "--" + c.boundary1 + LF
+		content += `Content-Type: text/html;` + LF + TAB + `charset="utf-8"` + LF
+		content += "Content-Transfer-Encoding: base64" + LF
+		content += LF
+		content += c.base64Encode(c.mClient.getContent()) + LF
+		content += LF
+		content += "--" + c.boundary1 + "--" + LF
 	}
-	header += mime
+	header += content
 
 	return header
 }
@@ -173,7 +191,7 @@ func (c *goSMTPConn) getAttachments() string {
 	text := ""
 	for _, file := range c.mClient.attachments {
 		path := file["path"]
-		name := fmt.Sprintf("=?utf-8?B?%s?=", c.base64Encode(file["name"]))
+		name := fmt.Sprintf("%s", c.bEncode(file["name"]))
 		text += c.boundary1 + LF
 		text += fmt.Sprintf(`Content-Type: application/octet-stream;%s%scharset="utf-8";%s%sname="%s"%s`, LF, TAB, LF, TAB, name, LF)
 		text += fmt.Sprintf(`Content-Disposition: attachment; filename="%s"%s`, name, LF)
@@ -215,7 +233,7 @@ func (c *goSMTPConn) getAttachments() string {
 		text += fB64LF
 		text += LF + LF
 	}
-	text += fmt.Sprintf("%s--%s", c.boundary1, LF)
+	text += fmt.Sprintf("%s--", c.boundary1)
 
 	return text
 }
@@ -225,14 +243,16 @@ func (c *goSMTPConn) authenticate() error {
 	var code string
 
 	// Step 1
-	code, err = c.echoCMD("AUTH LOGIN")
+	err = c.sendData("AUTH LOGIN")
 	if err != nil {
 		return err
 	}
-	if "334" != code && "250" != code {
-		return errors.New("AUTH LOGIN Authenticate Failure " + code)
+	for "334" != code {
+		code, err = c.recvData()
+		if err != nil {
+			return err
+		}
 	}
-
 	// Step 2
 	name := c.base64Encode(c.mClient.getUserName())
 	code, err = c.echoCMD(name)
@@ -249,7 +269,7 @@ func (c *goSMTPConn) authenticate() error {
 	if err != nil {
 		return err
 	}
-	if "235" != code && "334" != code {
+	if "235" != code {
 		return errors.New("PassWord Authenticate Failure " + code)
 	}
 
@@ -261,7 +281,7 @@ func (c *goSMTPConn) dial() error {
 	var err error
 	var code string
 
-	if c.mClient.tls {
+	if c.mClient.SSL {
 		c.conn, err = tls.Dial("tcp", c.mClient.getHostPort(), &tls.Config{})
 	} else {
 		c.conn, err = net.Dial("tcp", c.mClient.getHostPort())
@@ -273,12 +293,19 @@ func (c *goSMTPConn) dial() error {
 	c.conn.SetReadDeadline(time.Now().Add(time.Second * 30))
 
 	// Step 1
-	code, err = c.echoCMD("STARTTLS")
+	_, err = c.recvData()
 	if nil != err {
 		return err
 	}
-	if "220" != code {
-		return errors.New("STARTTLS Return not 220 , Is " + code)
+	if c.mClient.SSL {
+
+		//code, err = c.echoCMD("STARTTLS")
+		//if nil != err {
+		//	return err
+		//}
+		//if "220" != code {
+		//	return errors.New("STARTTLS Return not 220 , Is " + code)
+		//}
 	}
 
 	// Step 2 Send extended hello first (RFC 821)
@@ -337,7 +364,7 @@ func (c *goSMTPConn) sendContent() error {
 		return err
 	}
 	// 250 为 queued
-	if "354" != code && "250" != code {
+	if "250" != code {
 		fmt.Println("------send 3", code)
 	}
 

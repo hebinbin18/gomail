@@ -11,7 +11,7 @@ type auth struct {
 
 type client struct {
 	auth        auth
-	tls         bool
+	SSL         bool
 	hostPort    string
 	fromAddr    string
 	fromName    string
@@ -139,8 +139,8 @@ func (ms *client) SetMailType(t string) {
 	ms.mailType = t
 }
 
-func (ms *client) SetTLS() bool {
-	ms.tls = true
+func (ms *client) SetSSl() bool {
+	ms.SSL = true
 
 	return true
 }

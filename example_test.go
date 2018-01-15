@@ -10,20 +10,21 @@ import (
 func TestMail(t *testing.T) {
 	m := gomail.NewClient()
 	m.SetDebug()
-	m.SetTLS()
+	m.SetSSl()
 	m.SetHost("smtp.163.com", 465)
 	m.SetAuth("go_mail_test@163.com", "gomailtest123")
+
 	m.SetFromName("hebin")
-	//m.SetReplyAddr("4171947@qq.com")
-	//m.SetReplyName("Reply Name")
-	m.SetSubject("this is subject")
+	m.SetReplyAddr("4171947@qq.com")
+	//m.SetReplyName("re name")
+	m.SetSubject("时间")
 
 	m.AddAddress("hebin@zouke.com")
 	//m.AddCC("go_mail_test@163.com")
-	//m.AddBCC("43171947@qq.com")
+	//m.AddCC("43171947@qq.com")
 
 	m.SetHtmlMail()
-	m.SetMailContent("this is mail content !")
+	m.SetMailContent("今天下午见")
 	//m.AddAttachment("/test.jpg", "test.jpg")
 
 	err := m.SendMail()
