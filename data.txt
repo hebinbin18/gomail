@@ -1,0 +1,77 @@
+220 smtp.qq.com Esmtp QQ Mail Server
+EHLO hebin-Pro
+250-smtp.qq.com
+250-PIPELINING
+250-SIZE 73400320
+250-STARTTLS
+250-AUTH LOGIN PLAIN
+250-AUTH=LOGIN
+250-MAILCOMPRESS
+250 8BITMIME
+AUTH LOGIN
+334 VXNlcm5hbWU6
+xxxxxxxxxxxxxxxxxx
+334 UGFzc3dvcmQ6
+xxxxxxxxxxxxxxxxxx
+235 Authentication successful
+MAIL FROM:<hebin@xxxx.com>
+250 Ok
+RCPT TO:<hebin@xxxx.com>
+250 Ok
+RCPT TO:<43171947@qq.com>
+250 Ok
+DATA
+354 End data with <CR><LF>.<CR><LF>
+X-GUID: A1E7FC6B-CCBD-B4AC-D82B-7B1CC367BCCD
+From: "=?utf-8?B?aGViaW4=?="<hebin@xxxx.com>
+To: "=?utf-8?B?aGViaW4=?="<hebin@xxxx.com>, "=?utf-8?B?NDMxNzE5NDc=?="<43171947@qq.com>
+Subject: =?utf-8?B?YWZkIOetlOWkjSA=?=
+Mime-Version: 1.0
+Content-Type: multipart/mixed;
+	boundary="----=_NextPart_5A10F94D_823ACAE0_105F5C6D"
+Content-Transfer-Encoding: 8Bit
+Date: Sun, 19 Nov 2017 11:23:57 +0800
+Message-ID: <tencent_75251CD623489B929E9627D7@qq.com>
+X-QQ-MIME: TCMime 1.0 by Tencent
+X-Mailer: Foxmail_for_Mac 1.0.0
+
+This is a multi-part message in MIME format.
+
+------=_NextPart_5A10F94D_823ACAE0_105F5C6D
+Content-Type: multipart/alternative;
+	boundary="----=_NextPart_5A10F94D_823ACAE0_64AD0080";
+
+------=_NextPart_5A10F94D_823ACAE0_64AD0080
+Content-Type: text/plain;
+	charset="utf-8"
+Content-Transfer-Encoding: base64
+
+6YO95piv5Y+R5pS+
+
+------=_NextPart_5A10F94D_823ACAE0_64AD0080
+Content-Type: text/html;
+	charset="utf-8"
+Content-Transfer-Encoding: base64
+
+PGRpdiBzdHlsZT0iZm9udDoxNHB4LzEuNSAnTHVjaWRhIEdyYW5kZScsICflvq7ova/pm4Xp
+u5EnO2NvbG9yOiMzMzM7Ij48cCBzdHlsZT0iZm9udDoxNHB4LzEuNSAnTHVjaWRhIEdyYW5k
+ZSc7bWFyZ2luOjA7Ij7pg73mmK/lj5HmlL48L3A+PC9kaXY+
+
+------=_NextPart_5A10F94D_823ACAE0_64AD0080--
+
+------=_NextPart_5A10F94D_823ACAE0_105F5C6D
+Content-Type: application/octet-stream;
+	charset="utf-8";
+	name="=?utf-8?B?6L+Z6YeM5piv5Y+R56Wo55qE5rWL6K+V6ZmE5Lu2LnBkZg==?="
+Content-Disposition: attachment; filename="=?utf-8?B?6L+Z6YeM5piv5Y+R56Wo55qE5rWL6K+V6ZmE5Lu2LnBkZg==?="
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjYKJeLjz9MKMSAwIG9iago8PC9UeXBlL1hPYmplY3QvU3VidHlwZS9JbWFnZS9X
+....
+emUgMTIwPj4KJWlUZXh0LTUuNS41CnN0YXJ0eHJlZgo3NDAzMgolJUVPRgo=
+
+------=_NextPart_5A10F94D_823ACAE0_105F5C6D--
+
+.
+250 Ok: queued as
+QUIT

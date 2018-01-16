@@ -89,7 +89,7 @@ func (c *goSMTPConn) recvData() (string, error) {
 		return "", err
 	}
 
-	return data[0:3], nil
+	return data, nil
 }
 
 func (c *goSMTPConn) echoCMD(cmd string) (string, error) {
@@ -97,8 +97,12 @@ func (c *goSMTPConn) echoCMD(cmd string) (string, error) {
 	if nil != err {
 		return "", err
 	}
+	data, err := c.recvData()
+	if nil != err {
+		return "", err
+	}
 
-	return c.recvData()
+	return data[0:3], err
 }
 
 func (c *goSMTPConn) addMailAddress(buf *bytes.Buffer) {
@@ -116,12 +120,12 @@ func (c *goSMTPConn) addMailAddress(buf *bytes.Buffer) {
 	for i, addr := range c.mClient.addressBCC {
 		addrList3[i] = c.addrEncode("", addr)
 	}
-	buf.WriteString("To: " + strings.Join(addrList1, ";") + LF)
+	buf.WriteString("To: " + strings.Join(addrList1, ", ") + LF)
 	if len(addrList2) > 0 {
-		buf.WriteString("Cc: " + strings.Join(addrList2, ";") + LF)
+		buf.WriteString("Cc: " + strings.Join(addrList2, ", ") + LF)
 	}
 	if len(addrList3) > 0 {
-		buf.WriteString("Bcc: " + strings.Join(addrList3, ";") + LF)
+		buf.WriteString("Bcc: " + strings.Join(addrList3, ", ") + LF)
 	}
 	buf.WriteString("From: " + c.addrEncode(c.mClient.fromName, c.mClient.fromAddr) + LF)
 	if "" != c.mClient.replyAddr {
@@ -234,10 +238,11 @@ func (c *goSMTPConn) authenticate() error {
 		return err
 	}
 	for "334" != code {
-		code, err = c.recvData()
+		data, err := c.recvData()
 		if err != nil {
 			return err
 		}
+		code = data[0:3]
 	}
 	// Step 2
 	name := c.base64Encode([]byte(c.mClient.getUserName()))
@@ -330,7 +335,7 @@ func (c *goSMTPConn) sendContent() error {
 		return err
 	}
 	if "354" != code {
-		fmt.Println("------send 2", code)
+		return errors.New("CMD DATA return code not 354 is " + code)
 	}
 
 	// Step 4 开始发送正文 RFC 821
@@ -341,13 +346,17 @@ func (c *goSMTPConn) sendContent() error {
 	c.addMailBody(buf)
 	c.addMailAttachments(buf, boundary)
 	buf.WriteString(CRLF + ".")
-	code, err = c.echoCMD(buf.String())
+	err = c.sendData(buf.String())
+	if nil != err {
+		return err
+	}
+	data, err := c.recvData()
 	if nil != err {
 		return err
 	}
 	// 250 为 queued
-	if "250" != code {
-		fmt.Println("------send 3", code)
+	if "250" != data[0:3] {
+		return errors.New("Mail Send return: " + data)
 	}
 
 	return nil
