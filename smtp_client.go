@@ -3,7 +3,7 @@ package gomail
 import (
 	"fmt"
 	"strings"
-	"github.com/pkg/errors"
+	"errors"
 )
 
 type auth struct {
