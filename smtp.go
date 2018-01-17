@@ -79,8 +79,8 @@ func (c *goSMTPConn) sendData(dat string) error {
 
 func (c *goSMTPConn) recvData() (string, error) {
 	buf := make([]byte, 1024) // 515
-	_, err := c.conn.Read(buf)
-	data := string(buf)
+	cnt, err := c.conn.Read(buf)
+	data := string(buf[0:cnt])
 	if c.debug {
 		fmt.Println("<== GoMail Recv Data Content:", data)
 	}
