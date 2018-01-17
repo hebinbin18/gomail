@@ -2,6 +2,8 @@ package gomail
 
 import (
 	"fmt"
+	"strings"
+	"github.com/pkg/errors"
 )
 
 type auth struct {
@@ -64,6 +66,10 @@ func (ms *client) getServerHostName() string {
 	return "hebin-Pro"
 }
 
+func (ms *client) trim(s string) string {
+	return strings.Trim(strings.TrimSpace(s), " \n")
+}
+
 // 外部方法
 func (ms *client) SetDebug() {
 	ms.debug = true
@@ -114,21 +120,34 @@ func (ms *client) CloseNotification() {
 }
 
 func (ms *client) AddAddress(address string) {
+	if "" == ms.trim(address) {
+		return
+	}
 	ms.addressSend = append(ms.addressSend, address)
 	ms.address = append(ms.address, address)
 }
 
 func (ms *client) AddCC(address string) {
+	if "" == ms.trim(address) {
+		return
+	}
 	ms.addressCC = append(ms.addressCC, address)
 	ms.address = append(ms.address, address)
 }
 
 func (ms *client) AddBCC(address string) {
+	if "" == ms.trim(address) {
+		return
+	}
 	ms.addressBCC = append(ms.addressBCC, address)
 	ms.address = append(ms.address, address)
 }
 
 func (ms *client) AddAttachment(path, name string) {
+	if "" == ms.trim(path) {
+		return
+	}
+
 	file := map[string]string{"path": path, "name": name}
 	ms.attachments = append(ms.attachments, file)
 }
@@ -156,6 +175,10 @@ func (ms *client) SetSSl() bool {
 
 // SMTP 客户端
 func (ms *client) SendMail() error {
+	if 0 == len(ms.address) {
+		return errors.New("收件人不能为空")
+	}
+
 	conn := new(goSMTPConn)
 	conn.mClient = ms
 	conn.debug = ms.debug
