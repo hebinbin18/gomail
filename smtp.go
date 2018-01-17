@@ -355,7 +355,8 @@ func (c *goSMTPConn) sendContent() error {
 		return err
 	}
 	// 250 为 queued
-	if "250" != data[0:3] {
+	code = data[0:3]
+	if "250" != code && "220" != code {
 		return errors.New("Mail Send return: " + data)
 	}
 
@@ -364,14 +365,14 @@ func (c *goSMTPConn) sendContent() error {
 
 // 发送邮件
 func (c *goSMTPConn) Send() error {
-	if nil != c.dial() {
-		return errors.New("邮件服务器网络连接错误")
+	if err := c.dial(); nil != err {
+		return errors.New("邮件服务器网络连接错误" + err.Error())
 	}
-	if nil != c.authenticate() {
-		return errors.New("登录鉴权失败")
+	if err := c.authenticate(); nil != err {
+		return errors.New("登录鉴权失败" + err.Error())
 	}
-	if nil != c.sendContent() {
-		return errors.New("邮件服务器发送失败")
+	if err := c.sendContent(); nil != err {
+		return errors.New("邮件服务器发送失败" + err.Error())
 	}
 
 	return nil
