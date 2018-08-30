@@ -137,7 +137,7 @@ func (c *goSMTPConn) addMailAddress(buf *bytes.Buffer) {
 func (c *goSMTPConn) addMailHeader(buf *bytes.Buffer, boundary string) {
 	// 主题信息
 	buf.WriteString("Subject: " + c.bEncode(c.mClient.subject) + LF)
-	buf.WriteString(fmt.Sprintf("Message-ID: <54c3aee5da3b50b47a9ee09defb8c00e@%s>", c.mClient.getServerHostName()) + LF)
+	buf.WriteString(c.getMessageID() + LF)
 	buf.WriteString("X-Priority: " + c.mClient.priority + LF)
 	buf.WriteString("X-Mailer: GoMail 1.0.0" + LF)
 	// 已读回执
@@ -153,6 +153,11 @@ func (c *goSMTPConn) addMailHeader(buf *bytes.Buffer, boundary string) {
 		buf.WriteString(LF)
 		buf.WriteString("--" + boundary + LF)
 	}
+}
+
+func (c *goSMTPConn) getMessageID() string {
+	msg := fmt.Sprintf("Message-ID: <gomail_%s@%s>", c.base64Encode([]byte(time.Now().String())), c.mClient.getServerHostName())
+	return msg
 }
 
 func (c *goSMTPConn) addMailBody(buf *bytes.Buffer) {
